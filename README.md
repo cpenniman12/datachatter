@@ -6,7 +6,7 @@ A conversational natural language to SQL query tool powered by Anthropic's Claud
 
 ## How it works
 
-inquire about some dat
+user inquires about data
 <img width="923" alt="Screen Shot 2025-04-26 at 5 53 25 PM" src="https://github.com/user-attachments/assets/0b196bd4-dfb3-4cdc-bc45-5addcb435106" />
 
 claude references the data schema, and generates a sql queries to pull the required data
