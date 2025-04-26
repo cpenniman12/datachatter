@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Assistant</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Schema Sidebar Toggle Button -->
+        <button id="toggle-schema-btn" class="toggle-schema-btn"><i class="fas fa-database"></i> View Schema</button>
+
+        <!-- Schema Sidebar -->
+        <div id="schema-sidebar" class="schema-sidebar">
+            <button id="close-schema-btn" class="close-schema-btn">&times;</button>
+            <h3>Database Schema</h3>
+            <div class="schema-content">
+                <h4>Tables & Columns</h4>
+                <ul>
+                    <li>
+                        <strong>table_metadata</strong>
+                        <ul>
+                            <li>id (PK)</li>
+                            <li>table_name</li>
+                            <li>table_description</li>
+                            <li>embedding (vector)</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>column_metadata</strong>
+                        <ul>
+                            <li>id (PK)</li>
+                            <li>table_name</li>
+                            <li>column_name</li>
+                            <li>column_description</li>
+                            <li>embedding (vector)</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>companies</strong>
+                        <ul>
+                            <li>company_id (PK)</li>
+                            <li>ticker</li>
+                            <li>company_name</li>
+                            <li>sector</li>
+                            <li>industry</li>
+                            <li>founded_date</li>
+                            <li>headquarters</li>
+                            <li>employee_count</li>
+                            <li>ceo_name</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>company_financials</strong>
+                        <ul>
+                            <li>financial_id (PK)</li>
+                            <li>company_id (FK -> companies)</li>
+                            <li>fiscal_year</li>
+                            <li>fiscal_quarter</li>
+                            <li>revenue</li>
+                            <li>gross_profit</li>
+                            <li>operating_income</li>
+                            <li>net_income</li>
+                            <li>eps</li>
+                            <li>total_assets</li>
+                            <li>total_liabilities</li>
+                            <li>cash_and_equivalents</li>
+                            <li>report_date</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>stock_prices</strong>
+                        <ul>
+                            <li>price_id (PK)</li>
+                            <li>company_id (FK -> companies)</li>
+                            <li>price_date</li>
+                            <li>open_price</li>
+                            <li>high_price</li>
+                            <li>low_price</li>
+                            <li>close_price</li>
+                            <li>volume</li>
+                            <li>adj_close</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>analyst_estimates</strong>
+                        <ul>
+                            <li>estimate_id (PK)</li>
+                            <li>company_id (FK -> companies)</li>
+                            <li>analyst_firm</li>
+                            <li>target_price</li>
+                            <li>recommendation</li>
+                            <li>estimated_eps_next_quarter</li>
+                            <li>estimated_revenue_next_quarter</li>
+                            <li>estimate_date</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>supply_chain</strong>
+                        <ul>
+                            <li>relationship_id (PK)</li>
+                            <li>company_id (FK -> companies)</li>
+                            <li>supplier_id (FK -> companies)</li>
+                            <li>component</li>
+                            <li>annual_value</li>
+                            <li>contract_start_date</li>
+                            <li>contract_end_date</li>
+                            <li>risk_level</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <!-- Removed chat-header div completely -->
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <p>Hello! I'm your SQL assistant. Ask me anything about your database. You can view the schema using the button above.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <form id="query-form">
+                    <textarea id="question" placeholder="Ask a question about your database..." required></textarea>
+                    <button type="submit" class="submit-btn"><i class="fas fa-paper-plane"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for visualizations -->
+    <div id="chart-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Data Visualization</h2>
+            <div class="loading-spinner"></div>
+            <div id="chart-content" class="chart-content"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html> 

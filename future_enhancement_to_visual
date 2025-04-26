@@ -1,0 +1,435 @@
+import os
+import json
+import pandas as pd
+import re
+import anthropic
+import traceback
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables (if using a .env file)
+load_dotenv()
+
+# Get API key from environment variable
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+# Initialize Anthropic client
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+def analyze_dataframe(df, model="claude-3-7-sonnet-20250219"):
+    """
+    First model: Analyzes the DataFrame and prepares it for visualization.
+    
+    Args:
+        df: Pandas DataFrame to analyze
+        model: Claude model to use
+    
+    Returns:
+        Analysis results as a dictionary
+    """
+    # Convert DataFrame to JSON for the prompt
+    df_json = df.to_json(orient='records')
+    data_sample = json.loads(df_json)
+    
+    # Create metadata
+    metadata = {
+        "columns": list(df.columns),
+        "shape": df.shape,
+        "dtypes": {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)}
+    }
+    
+    # Create the analysis prompt
+    prompt = """
+    You are a financial data analyst examining a DataFrame with the following structure:
+    - Shape: {shape}
+    - Columns: {columns}
+    - Column types: {dtypes}
+    
+    Here's the complete financial data:
+    {data}
+    
+    This is financial data for a company called BIDW. Analyze this data to:
+    
+    1. Clean and prepare the data for visualization:
+       - Parse dates correctly
+       - Handle any missing values
+       - Convert financial values to appropriate scales (millions/billions)
+       - Calculate any derived metrics that would be useful
+    
+    2. Identify key financial insights:
+       - Revenue, profit, and margin trends
+       - Balance sheet health (assets vs liabilities)
+       - EPS trends and potential implications
+       - Cash position changes
+    
+    3. Recommend specific visualizations:
+       - Which chart types would best show the key financial metrics
+       - How to organize related metrics
+       - Which comparisons would be most insightful
+    
+    Return your analysis in JSON format with the following structure:
+    {{
+        "cleaned_data": [], // Processed data ready for visualization
+        "calculated_metrics": {{...}}, // Any derived financial metrics
+        "insights": [...], // List of key financial insights
+        "visualization_recommendations": [...], // Chart recommendations
+        "data_structure": {{...}} // Notes about data organization
+    }}
+    
+    For the cleaned_data, ensure all numbers are formatted appropriately (in millions for better visualization), dates are properly formatted, and the data is sorted chronologically.
+    """.format(
+        shape=metadata['shape'],
+        columns=metadata['columns'],
+        dtypes=metadata['dtypes'],
+        data=json.dumps(data_sample, indent=2)
+    )
+    
+    # Call the Claude model for analysis
+    print("Analyzing financial data with Claude 3.7 Sonnet...")
+    response = client.messages.create(
+        model=model,
+        max_tokens=4000,
+        temperature=0.0,
+        system="You are a financial data analysis expert who helps analyze company financial data and prepare it for visualization. Return your analysis in valid JSON format as requested in the prompt.",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+    
+    # Extract JSON from the response
+    message_content = response.content[0].text
+    
+    # Find the JSON object in the response
+    try:
+        # Try to load the entire response as JSON
+        analysis_result = json.loads(message_content)
+    except json.JSONDecodeError:
+        # If that fails, try to extract JSON from the message
+        json_pattern = r'```json\n([\s\S]*?)\n```'
+        matches = re.findall(json_pattern, message_content)
+        if matches:
+            analysis_result = json.loads(matches[0])
+        else:
+            json_pattern = r'({[\s\S]*})'
+            matches = re.findall(json_pattern, message_content)
+            if matches:
+                analysis_result = json.loads(matches[0])
+            else:
+                raise ValueError("Could not extract JSON from Claude's response.")
+    
+    print("Analysis complete.")
+    return analysis_result
+
+def generate_visualization_code(analysis_result, model="claude-3-7-sonnet-20250219"):
+    """
+    Second model: Generates visualization code based on the analysis result.
+    
+    Args:
+        analysis_result: Analysis result from analyze_dataframe
+        model: Claude model to use
+    
+    Returns:
+        Visualization code as a string
+    """
+    # Create the visualization prompt
+    prompt = """
+    You are an expert financial data visualization developer. Create a comprehensive dashboard for Company BIDW based on the following financial analysis:
+    
+    {analysis}
+    
+    IMPORTANT INSTRUCTIONS:
+    
+    1. Create a React component called FinancialDashboard
+    2. DO NOT use import statements - React and Recharts components are available as global variables
+    3. Use Recharts for visualization with components like LineChart, BarChart, etc.
+    4. Use standard Tailwind CSS classes for styling
+    
+    Your component should:
+    - Highlight key financial insights from the analysis
+    - Use appropriate chart types for different metrics (line charts for trends, bar charts for comparisons)
+    - Organize metrics into logical dashboard sections with tabs
+    - Include proper formatting for financial numbers ($ prefixes, commas)
+    - Use clear labels, titles, and legends for all charts
+    
+    DO NOT USE ANY IMPORT STATEMENTS OR EXPORT STATEMENTS. The component will be rendered in a browser environment where React and Recharts are already loaded as global variables.
+    
+    Here's a scaffold to get you started:
+    
+    ```jsx
+    const FinancialDashboard = () => {{
+      const [activeTab, setActiveTab] = useState('overview');
+      
+      // Your financial data, tabs, and visualization code here
+      
+      return (
+        <div className="bg-gray-50 min-h-screen p-6">
+          {/* Your dashboard UI here */}
+        </div>
+      );
+    }};
+    ```
+    """.format(
+        analysis=json.dumps(analysis_result, indent=2)
+    )
+    
+    # Call the Claude model for visualization code generation
+    print("Generating visualization code with Claude 3.7 Sonnet...")
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=8000,
+            temperature=0.0,
+            system="You are a financial visualization expert creating a React component for browsers. DO NOT use any import or export statements. Create a component called FinancialDashboard that uses React Hooks and Recharts, assuming these are available globally. Format all financial figures properly and ensure all charts are properly labeled.",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        # Extract code from the response
+        message_content = response.content[0].text
+        
+        # Try multiple extraction approaches in order of preference
+        
+        # First, try to find code block with jsx language marker
+        code_pattern = r'```jsx([\s\S]*?)```'
+        matches = re.search(code_pattern, message_content)
+        
+        if matches:
+            print("Found code block with jsx marker")
+            return matches.group(1).strip()
+        
+        # Try to find code block with other language markers
+        code_pattern = r'```(?:javascript|react|js)([\s\S]*?)```'
+        matches = re.search(code_pattern, message_content)
+        
+        if matches:
+            print("Found code block with language marker")
+            return matches.group(1).strip()
+        
+        # Try to find any code block
+        fallback_pattern = r'```([\s\S]*?)```'
+        fallback_matches = re.search(fallback_pattern, message_content)
+        
+        if fallback_matches:
+            print("Found code block without language marker")
+            return fallback_matches.group(1).strip()
+        
+        # Try to find React component definition
+        component_pattern = r'(?:const|function)\s+FinancialDashboard\s*=?\s*(?:\(\)\s*=>|\([^)]*\)\s*{)[\s\S]*'
+        component_matches = re.search(component_pattern, message_content)
+        
+        if component_matches:
+            print("Found React component definition without code block markers")
+            return component_matches.group(0)
+        
+        # Last resort: just use the entire message content
+        print("No code patterns detected, using full response")
+        return message_content
+        
+    except Exception as e:
+        print(f"Error generating visualization: {str(e)}")
+        raise ValueError("Failed to generate visualization code")
+
+def create_visualization_html(code, dashboard_title="BIDW Financial Dashboard"):
+    """
+    Create an HTML page with the visualization.
+    
+    Args:
+        code: React component code
+        dashboard_title: Title for the dashboard
+    
+    Returns:
+        HTML string
+    """
+    # Clean up the code for browser compatibility
+    # Remove ES module imports/exports
+    code = re.sub(r'import React.*?from [\'"]react[\'"];?\n?', '', code)
+    code = re.sub(r'import \{(.*?)\} from [\'"]react[\'"];?\n?', '', code)
+    code = re.sub(r'import \{(.*?)\} from [\'"]recharts[\'"];?\n?', '', code)
+    code = re.sub(r'export default FinancialDashboard;?', '', code)
+    
+    html = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@17.0.2/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17.0.2/umd/react-dom.development.js"></script>
+    
+    <!-- Load Recharts directly - note the lowercase name in URL -->
+    <script src="https://unpkg.com/recharts@2.1.15/umd/recharts.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone@7.18.13/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }}
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+    // Make React available in the global scope
+    const {{ useState, useEffect, useRef }} = React;
+    
+    // Make Recharts components available - capital 'R' in Recharts
+    const {{
+      LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
+      XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+      RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+      ComposedChart, Cell, ReferenceLine
+    }} = Recharts;
+    
+    // React component
+    {code}
+    
+    // Render the dashboard
+    ReactDOM.render(
+      <React.StrictMode>
+        <FinancialDashboard />
+      </React.StrictMode>,
+      document.getElementById('root')
+    );
+    </script>
+</body>
+</html>""".format(
+        title=dashboard_title,
+        code=code
+    )
+    
+    print("HTML visualization created.")
+    return html
+
+def visualize_financial_data(df):
+    """
+    Main function to create a financial visualization from a DataFrame
+    using a two-model approach.
+    
+    Args:
+        df: Pandas DataFrame with financial data
+    
+    Returns:
+        Tuple of (analysis_result, visualization_code, html)
+    """
+    try:
+        # Step 1: First model analyzes the dataframe
+        print("Starting financial visualization pipeline ({})...".format(datetime.now()))
+        analysis_result = analyze_dataframe(df)
+        
+        # Step 2: Second model generates visualization code
+        print("Generating visualization code...")
+        visualization_code = generate_visualization_code(analysis_result)
+        
+        # Step 3: Create HTML output
+        print("Creating HTML visualization...")
+        html = create_visualization_html(visualization_code)
+        
+        # Step 4: Save the HTML to a file
+        output_file = "bidw_financial_dashboard.html"
+        with open(output_file, "w") as f:
+            f.write(html)
+        print("Visualization saved to {}".format(output_file))
+        
+        # Save the raw code for debugging if needed
+        with open("raw_visualization_code.js", "w") as f:
+            f.write(visualization_code)
+        print("Raw visualization code saved to raw_visualization_code.js")
+        
+        return analysis_result, visualization_code, html
+    
+    except Exception as e:
+        print(f"Error in visualization pipeline: {str(e)}")
+        traceback.print_exc()
+        raise e
+
+if __name__ == "__main__":
+    # Input data - the BIDW company financial data
+    data = [
+        {
+            "cash_and_equivalents": 703211358.58,
+            "company_name": "Company BIDW",
+            "eps": 0.90,
+            "fiscal_quarter": 3,
+            "fiscal_year": 2020,
+            "gross_profit": 955149733.18,
+            "industry": "IT Services",
+            "net_income": 507572462.16,
+            "operating_income": 735062611.04,
+            "report_date": "Thu, 16 Apr 2020 00:00:00 GMT",
+            "revenue": 2155768706.89,
+            "sector": "Technology",
+            "ticker": "BIDW",
+            "total_assets": 5466797968.66,
+            "total_liabilities": 4677022678.59
+        },
+        {
+            "cash_and_equivalents": 638660363.72,
+            "company_name": "Company BIDW",
+            "eps": 0.77,
+            "fiscal_quarter": 3,
+            "fiscal_year": 2019,
+            "gross_profit": 1400884556.45,
+            "industry": "IT Services",
+            "net_income": 547928275.05,
+            "operating_income": 273774119.80,
+            "report_date": "Mon, 06 Aug 2018 00:00:00 GMT",
+            "revenue": 2686181050.40,
+            "sector": "Technology",
+            "ticker": "BIDW",
+            "total_assets": 16114193598.90,
+            "total_liabilities": 9488324600.38
+        },
+        {
+            "cash_and_equivalents": 629273999.88,
+            "company_name": "Company BIDW",
+            "eps": 1.36,
+            "fiscal_quarter": 2,
+            "fiscal_year": 2019,
+            "gross_profit": 1639617719.62,
+            "industry": "IT Services",
+            "net_income": 348534038.80,
+            "operating_income": 288569602.83,
+            "report_date": "Sun, 08 May 2022 00:00:00 GMT",
+            "revenue": 2853470135.64,
+            "sector": "Technology",
+            "ticker": "BIDW",
+            "total_assets": 8260666027.16,
+            "total_liabilities": 9349301989.52
+        },
+        {
+            "cash_and_equivalents": 477528751.40,
+            "company_name": "Company BIDW",
+            "eps": 0.55,
+            "fiscal_quarter": 3,
+            "fiscal_year": 2018,
+            "gross_profit": 921729341.15,
+            "industry": "IT Services",
+            "net_income": None,
+            "operating_income": None,
+            "report_date": None,
+            "revenue": None,
+            "sector": "Technology",
+            "ticker": "BIDW",
+            "total_assets": None,
+            "total_liabilities": None
+        }
+    ]
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+    
+    # Run the visualization pipeline
+    analysis_result, visualization_code, html = visualize_financial_data(df)
+    
+    print("\nVisualization process complete! ({})".format(datetime.now()))

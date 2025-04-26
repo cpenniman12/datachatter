@@ -1,0 +1,17 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+anthropic==0.8.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+requests==2.31.0
+flask-cors==4.0.0
+mysql-connector-python==8.3.0
+SQLAlchemy==2.0.23
+elasticsearch==8.10.0
+elasticsearch-dsl==8.9.0
+gunicorn==21.2.0
+flask-restful==0.3.10
+numpy==1.26.0
+pandas==2.1.1
+matplotlib==3.8.0
+plotly==5.17.0 
