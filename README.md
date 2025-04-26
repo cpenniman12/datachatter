@@ -6,16 +6,15 @@ A conversational natural language to SQL query tool powered by Anthropic's Claud
 
 ## How it works
 
+inquire about some dat
 <img width="923" alt="Screen Shot 2025-04-26 at 5 53 25 PM" src="https://github.com/user-attachments/assets/0b196bd4-dfb3-4cdc-bc45-5addcb435106" />
 
-
+claude references the data schema, and generates a sql queries to pull the required data
 <img width="510" alt="Screen Shot 2025-04-26 at 5 53 37 PM" src="https://github.com/user-attachments/assets/22a1d58b-a1d7-4749-a8d7-8810bf6813c5" />
+The sql executes against the postgres DB
 
+The resulting dataframe is sent to another instance of claude which then generates HTML/CSS/CS code for the visual. This code is then rendered and presented in the chat. 
 <img width="988" alt="Screen Shot 2025-04-26 at 5 53 03 PM" src="https://github.com/user-attachments/assets/b9493c69-71cd-41bd-88d1-269c8f9fccfe" />
-
-
-## Explanation
-Dummy financial data is fed into claude alongside user question, claude generates sql, script executes sql, returns the results back to the user, and then gives the user an option to create a visual from the data. If the user decides to generate a visual, the dataframe gets sent to another instance of claude, which writes HTML/CSS/CS code for the visual. This code is then rendered and presented in the chat. 
 
 
 ###*****FUTURE ENHANCEMENTS! 
